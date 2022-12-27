@@ -1,0 +1,185 @@
+---
+title: "Logistic Regression"
+author: "Oliver Imhans"
+date: "9/25/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.height = 3.3, 
+fig.width = 5.5, fig.align = "center")
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(corrgram)
+library(DataExplorer)
+library(ppcor)
+library(caTools)
+library(ggplot2)
+library(corrplot) 
+library(data.table)
+library(plotly)
+library(modelr) 
+library(arm) 
+library(cowplot)
+```
+
+Logistic regression which is also known as the logit model, predicts the probability of an event occurring. It is used to model dichotomous outcome variables. Logistic regression implies that the possible outcomes are not numerical but rather categorical. Examples of such categories are:  Yes / No or 1 / 0.
+
+Logistic regression in R Programming is a classification algorithm used to find the probability of event success and event failure. 
+
+**Logistic sample: model <- glm(Y ~ x, binomial(), data)**
+
+The *logit function* is shown below
+
+$$logit(p) = log(\frac{p}{1-p})$$
+
+To get values of x between 0 and 1, take the inverse.
+
+$$logit^{-1}(a) = \frac{1}{1+e^{-a}}$$
+
+
+$$Deviance = -2 *log - likelihood = -2LL$$
+$$AIC =-2LL+2k$$
+Using AIC, we can compare multiple models, but as we increase the number of predictors the AIC k penalty will increase.
+
+Below is an example of how to implement the Logistic Regression.
+
+The dataset used for this project can be downloaded at this link: https://www.kaggle.com/datasets/dileep070/heart-disease-prediction-using-logistic-regression?resource=download
+
+The variables in the dataset are:
+
+Male: Gender (1 = Male, 0 = Female)
+Age: Patient age
+Education: Education level (1 = some high school, 2 = high school/GED, 3 = some college, 4 = college)
+CurrentSmoker: 1 = patient is smoker
+CigsPerDay: Number of cigarettes patient smokes per day
+BPMeds: 1 = patient is on blood pressure medication
+PrevalentStroke: 1 = patient has previously had a stroke
+PrevalentHyp: 1 = patient has hypertension
+Diabetes: 1 = patient has diabetes
+Chol: total cholesterol (mg/dL)
+SysBP: systolic blood pressure (mmHg)
+DiaBP: diastolic blood pressure (mmHg)
+BMI: body mass index (weight / $height^2$)
+HeartRate: Heart rate (beats per minute)
+Glucose: blood glucose level (mg/dL)
+TenYearCHD: 1 = patient developed coronary heart disease within 10 years of exam
+```{r}
+# Importing the dataset
+data = read.csv('framingham.csv')
+```
+
+```{r}
+head(data)
+```
+
+```{r}
+dim(data)
+```
+
+```{r}
+summary(data)
+```
+```{r}
+#checking for missing values
+sum(is.na(data))
+```
+```{r}
+#removes cases with missing data
+data <- data %>% drop_na 
+```
+
+
+```{r}
+#checking again for missing values
+sum(is.na(data))
+```
+
+```{r}
+# Sub-setting the data
+male <- filter(data, male == 1)
+dim(male)
+
+```
+
+```{r}
+female <- filter(data, male == 0)
+dim(female)
+```
+
+```{r}
+# Visualizing Data
+fcolor = "red"
+mcolor = "blue"
+
+female.plot <- ggplot(female, aes(x = age, y = TenYearCHD)) + 
+  geom_jitter(width = 0, height = 0.05, color = fcolor) +
+  labs(title = "Female TenYearCHD")
+
+male.plot <- ggplot(male, aes(x = age, y = TenYearCHD)) + 
+  geom_jitter(width = 0, height = 0.05, color = mcolor) + 
+  labs(title = "Male TenYearCHD")
+
+plot_grid(female.plot, male.plot)
+```
+
+```{r}
+# A quick plot of age against TenYearCHD
+binnedplot(data$age, data$TenYearCHD,xlab="Age",ylab="TenYearCHD",main="TenYearCHD vs Age")
+```
+
+```{r}
+binnedplot(data$totChol, data$TenYearCHD, xlab="Total Cholesterol",ylab="TenYearCHD",main="TenYearCHD vs Cholesterol")
+```
+**Fitting the logistic regression model**
+
+```{r}
+# split the data into training and testing data:
+
+set.seed(42)
+
+split = sample.split(data, SplitRatio = 0.8)
+train = subset(data, split == TRUE)
+test = subset(data, split == FALSE)
+
+row.names(train) <- NULL
+row.names(test) <- NULL
+```
+
+
+
+```{r}
+# using the glm() command on the training data.
+# summary to view the outcome
+logit <- glm(TenYearCHD ~., family="binomial", data=train)
+summary(logit)
+```
+
+
+**Making Prediction based on the model**
+
+```{r}
+subject_1 = data.frame(male = 1, age = 50, education = 2, currentSmoker = 1,  cigsPerDay =  0, BPMeds =  0, prevalentStroke = 0, prevalentHyp = 0,  diabetes = 1, totChol = 150,   sysBP = 100,  diaBP = 80,   BMI = 35, heartRate = 75,  glucose = 70)
+predict(logit,subject_1,type='response')
+```
+**According to the model, the probability of this subject(smoker with diabetes) developing heart disease within 10 years is  68.6%.**
+
+```{r}
+subject_2 = data.frame(male = 1, age = 50, education = 2, currentSmoker = 0,  cigsPerDay =  0, BPMeds =  0, prevalentStroke = 0, prevalentHyp = 0,  diabetes = 0, totChol = 150,   sysBP = 100,  diaBP = 80,   BMI = 35, heartRate = 75,  glucose = 70)
+predict(logit,subject_2,type='response')
+```
+**According to the model, the probability of this subject(none smoker without diabetes) developing heart disease within 10 years is  56.39%.**
+
+It is important to note, that the probability of a  subject developing heart disease within 10 years, varies for a smoker with diabetes and a none smoker without diabetes. 
+
+
+Other Predictions using classification is also possible. That discussion will be carried out in the python version of Logistic Regression.
+
+
+
+
+
+
